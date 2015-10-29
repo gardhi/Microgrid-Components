@@ -79,7 +79,7 @@ for year = loadCurve_titles                                   % outer loop going
     load_curves_counter = load_curves_counter + 1;
     
     % importing 3 data files that describe one year with hourly resolution i.e. 24 x 365 = (8760)-row vectors.                                                
-    path_to_dataBase = 'C:\Users\gardhi\Documents\Bhutan Project\Microgrid-Components\dataBase\';
+    path_to_dataBase = '.\dataBase\';
     irr = importdata([path_to_dataBase, 'solar_data_Phuntsholing_baseline.mat']);                       % Use \ for Windows and / for Mac and Linux
     filename = ([path_to_dataBase, 'LoadCurve_normalized_single_3percent_',num2str(year),'.mat']);      % Average hourly global radiation (beam + diffuse) incident on the PV array [kW/m2]. Due to the simulation step [1h], this is also [kWh/m2]
     Load = importdata(filename);                                                                        % Import Load curve 
