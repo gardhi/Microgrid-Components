@@ -79,7 +79,7 @@ for year = loadCurve_titles                                   % outer loop going
     load_curves_counter = load_curves_counter + 1;
     
     % importing 3 data files that describe one year with hourly resolution i.e. 24 x 365 = (8760)-row vectors.                                                
-    path_to_dataBase = '.\dataBase\';
+    path_to_dataBase = 'C:\Users\gardhi\Documents\Bhutan Project\Microgrid-Components\dataBase\';
     irr = importdata([path_to_dataBase, 'solar_data_Phuntsholing_baseline.mat']);                       % Use \ for Windows and / for Mac and Linux
     filename = ([path_to_dataBase, 'LoadCurve_normalized_single_3percent_',num2str(year),'.mat']);      % Average hourly global radiation (beam + diffuse) incident on the PV array [kW/m2]. Due to the simulation step [1h], this is also [kWh/m2]
     Load = importdata(filename);                                                                        % Import Load curve 
@@ -93,7 +93,12 @@ for year = loadCurve_titles                                   % outer loop going
     batt_balance = zeros(1,length(irr));    % Powerflow in battery. Positive flow out from battery, negative flow is charging
     num_batt = zeros(n_PV, n_batt);         % number of batteries employed due to lifetime limit
     SoC = zeros(1,size(Load,2));            % to save step-by-step SoC (State of Charge) of the battery
-    SoC_every_scenario = zeros(length(irr)+1, n_PV, n_batt);
+    
+    % For logging and later plotting in Data-Analysis
+    SoC_every_scenario = zeros(length(irr)+1, n_PV, n_batt);    
+    P_pv_every_scenario = zeros(length(irr), n_PV, n_batt);
+    batt_balance_pos_every_scenario = zeros(length(irr), n_PV, n_batt);
+    
     IC = zeros(n_PV, n_batt);               % Investment Cost (IC) []
     YC = zeros(n_PV, n_batt);               % Operations & Maintenance & replacement; present cost []
 
@@ -197,13 +202,16 @@ for year = loadCurve_titles                                   % outer loop going
                 end
             end
             
+            % Moved out of hardcode plotting part
+            % TODO: document this section
             SoC_every_scenario(:,PV_i,batt_i) = SoC(:);
-
+            P_pv_every_scenario(:,PV_i,batt_i) = P_pv(:); % TODO:: Scrutinize P_pv in logplot.m
+            batt_balance_pos_every_scenario(:,PV_i,batt_i) = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
            
             %% Hardcode plotting (out of date)
             
             if  false %batt_cap_i == 770 && PVpower_i == 170     %PV_i == 2      % temporary bad solution
-                batt_balance_pos = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
+                %batt_balance_pos = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
                 LL_this = LL(:,PV_i,batt_i);                            % Loss of Load matrix as function of time for these fixed values of PV and battery.
                 abs(sum(LL_this) / sum(Load));                          % Finds percentage of Load not served (w.r.t. kWh)
                 length(LL_this(find(LL_this<0))) / length(LL_this);     % System Average Interruption Frequency Index (SAIFI), how many hours are without power  (w.r.t. hours)
@@ -379,7 +387,7 @@ for year = loadCurve_titles                                   % outer loop going
         ylabel('PV array size [kW]');
 
         figure(6);
-        mesh(min_batt : step_batt : max_batt, min_PV : step_PV : max_PV, LCoE);
+        mesh(min_batt : step_batt : max_batt, min_PV  : step_PV : max_PV, LCoE);
         title('Levelized Cost of Energy');
         set(gca,'FontSize',12,'FontName','Times New Roman','fontWeight','bold')
         xlabel('Battery Bank size [kWh]');
