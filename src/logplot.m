@@ -98,6 +98,7 @@ for year = loadCurve_titles                                   % outer loop going
     SoC_every_scenario = zeros(length(irr)+1, n_PV, n_batt);    
     P_pv_every_scenario = zeros(length(irr), n_PV, n_batt);
     batt_balance_pos_every_scenario = zeros(length(irr), n_PV, n_batt);
+    flow_from_batt_every_scenario(:,PV_i,batt_i) = zeros(length(irr), n_PV, n_batt);
     
     IC = zeros(n_PV, n_batt);               % Investment Cost (IC) []
     YC = zeros(n_PV, n_batt);               % Operations & Maintenance & replacement; present cost []
@@ -200,91 +201,95 @@ for year = loadCurve_titles                                   % outer loop going
                         SoC(t+1) = SoC_min;
                     end
                 end
+                
+                
+                
             end
             
             % Moved out of hardcode plotting part
             % TODO: document this section
+            %flow_from_batt_every_scenario(:,PV_i,batt_i) = flow_from_batt(:);
             SoC_every_scenario(:,PV_i,batt_i) = SoC(:);
             P_pv_every_scenario(:,PV_i,batt_i) = P_pv(:); % TODO:: Scrutinize P_pv in logplot.m
             batt_balance_pos_every_scenario(:,PV_i,batt_i) = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
            
-            %% Hardcode plotting (out of date)
-            
-            if  false %batt_cap_i == 770 && PVpower_i == 170     %PV_i == 2      % temporary bad solution
-                %batt_balance_pos = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
-                LL_this = LL(:,PV_i,batt_i);                            % Loss of Load matrix as function of time for these fixed values of PV and battery.
-                abs(sum(LL_this) / sum(Load));                          % Finds percentage of Load not served (w.r.t. kWh)
-                length(LL_this(find(LL_this<0))) / length(LL_this);     % System Average Interruption Frequency Index (SAIFI), how many hours are without power  (w.r.t. hours)
-
-                disp(batt_i)
-                disp(PV_i)
-                
-                
-                if makePlot == 1
-                    figure(1)
-                    plot(Load,'Color',[72 122 255] / 255)
-                    hold on
-                    plot(P_pv,'Color',[255 192 33] / 255)
-                    hold on
-                    plot(batt_balance_pos,'Color',[178 147 68] / 255)
-                    hold off
-                    xlabel('Time over the year [hour]')
-                    ylabel('Energy [kWh]')
-                    title('Energy produced and estimated load profile over the year (2nd steps PV and Batt)')
-                    legend('Load profile','Energy from PV', 'Energy flow from battery')
-
-                    % integration of figure(1) to find rough LLP estimate
-                    free = min(Load, P_pv);                                         % energy for free, i.e. directly from PV without battery intervenience, is the area under this graph. 
-                                                                                    % N.B. Assumption: both Load and P_pv are positive functions
-                    time = 1:length(irr);
-                    free_area = trapz(time, free);                                  % discrete integration using trapeziums. Might not be the best solution for non-linear data. See http://se.mathworks.com/help/matlab/math/integration-of-numeric-data.html
-                    area_to_batt = trapz(time, P_pv) - free_area;                   % by definition this should be positive
-                    area_load_needed_from_batt = trapz(time, Load) - free_area;     % by definition this should be positive
-
-                    unmet_load = area_load_needed_from_batt - area_to_batt;
-                    unmet_load_perc = unmet_load / trapz(time, Load) * 100;          % equal to Loss of Load Probability. But rough estimate since only comparing totals of load and P_pv! And SoC at end of the day influences next day. (Negative means overproduction)
-
-                    % plot functions for an average day in figure(2)
-                    nr_days = length(irr) / 24;                    
-                    Load_av = zeros(1,24);                              % vector for average daily Load
-                    P_pv_av = zeros(1,24);                              % vector for average daily P_pv
-                    batt_balance_pos_av = zeros(1,24);                  % vector for average daily batt_balance_pos. This is misleading since it is influenced by state of charge of previous days.
-                    for hour = 1:24                                     % iterate over all times 1:00, 2:00 etc.
-                    hours_i = hour : 24 : (nr_days - 1) * 24 + hour;    % range to pick the i-th hour of each day throughout the yearly data, i.e. 1:00 of 1 January, 1:00 of 2 January etc.
-                        for k = hours_i
-                            Load_av(hour) = Load_av(hour) + Load(k);
-                            P_pv_av(hour) = P_pv_av(hour) + P_pv(k);
-                            batt_balance_pos_av(hour) = batt_balance_pos_av(hour) + batt_balance_pos(k);
-                        end
-                        Load_av(hour) = Load_av(hour) / nr_days;
-                        P_pv_av(hour) = P_pv_av(hour) / nr_days;
-                        batt_balance_pos_av(hour) = batt_balance_pos_av(hour) / nr_days;
-                    end
-                    
-                    figure(2)
-                    plot(Load_av,'Color',[72 122 255] / 255)
-                    hold on
-                    plot(P_pv_av,'Color',[255 192 33] / 255)
-                    hold on
-                    plot(batt_balance_pos_av,'Color',[178 147 68] / 255)
-                    hold off
-                    xlabel('Time over the day [hour]')
-                    ylabel('Energy [kWh]')
-                    title('Energy produced and estimated load profile of an average day (2nd steps PV and Batt)')
-                    legend('Load profile','Energy from PV', 'Energy flow in battery')
-                                        
-                    figure(3)    
-                    plot(ELPV(:,PV_i, batt_i) ./ batt_cap_i + 1,'Color',[142 178 68] / 255)
-                    hold on
-                    plot(- LL(:,PV_i, batt_i) ./ batt_cap_i + SoC_min,'Color',[255 91 60] / 255)
-                    hold on
-                    plot(SoC,'Color',[64 127 255] / 255)
-                    hold off
-                    xlabel('Time over the year [hour]')
-                    ylabel('Power refered to State of Charge of the battery')
-                    legend('Overproduction, not utilized', 'Loss of power', 'State of charge')
-                end
-            end
+%             %% Hardcode plotting (out of date)
+%             
+%             if  false %batt_cap_i == 770 && PVpower_i == 170     %PV_i == 2      % temporary bad solution
+%                 %batt_balance_pos = subplus(batt_balance);               % batt_balance_pos becomes a vector only containing positive values in batt_balance i.e. only interested in when discharging. Negative values = 0
+%                 LL_this = LL(:,PV_i,batt_i);                            % Loss of Load matrix as function of time for these fixed values of PV and battery.
+%                 abs(sum(LL_this) / sum(Load));                          % Finds percentage of Load not served (w.r.t. kWh)
+%                 length(LL_this(find(LL_this<0))) / length(LL_this);     % System Average Interruption Frequency Index (SAIFI), how many hours are without power  (w.r.t. hours)
+% 
+%                 disp(batt_i)
+%                 disp(PV_i)
+%                 
+%                 
+%                 if makePlot == 1
+%                     figure(1)
+%                     plot(Load,'Color',[72 122 255] / 255)
+%                     hold on
+%                     plot(P_pv,'Color',[255 192 33] / 255)
+%                     hold on
+%                     plot(batt_balance_pos,'Color',[178 147 68] / 255)
+%                     hold off
+%                     xlabel('Time over the year [hour]')
+%                     ylabel('Energy [kWh]')
+%                     title('Energy produced and estimated load profile over the year (2nd steps PV and Batt)')
+%                     legend('Load profile','Energy from PV', 'Energy flow from battery')
+% 
+%                     % integration of figure(1) to find rough LLP estimate
+%                     free = min(Load, P_pv);                                         % energy for free, i.e. directly from PV without battery intervenience, is the area under this graph. 
+%                                                                                     % N.B. Assumption: both Load and P_pv are positive functions
+%                     time = 1:length(irr);
+%                     free_area = trapz(time, free);                                  % discrete integration using trapeziums. Might not be the best solution for non-linear data. See http://se.mathworks.com/help/matlab/math/integration-of-numeric-data.html
+%                     area_to_batt = trapz(time, P_pv) - free_area;                   % by definition this should be positive
+%                     area_load_needed_from_batt = trapz(time, Load) - free_area;     % by definition this should be positive
+% 
+%                     unmet_load = area_load_needed_from_batt - area_to_batt;
+%                     unmet_load_perc = unmet_load / trapz(time, Load) * 100;          % equal to Loss of Load Probability. But rough estimate since only comparing totals of load and P_pv! And SoC at end of the day influences next day. (Negative means overproduction)
+% 
+%                     % plot functions for an average day in figure(2)
+%                     nr_days = length(irr) / 24;                    
+%                     Load_av = zeros(1,24);                              % vector for average daily Load
+%                     P_pv_av = zeros(1,24);                              % vector for average daily P_pv
+%                     batt_balance_pos_av = zeros(1,24);                  % vector for average daily batt_balance_pos. This is misleading since it is influenced by state of charge of previous days.
+%                     for hour = 1:24                                     % iterate over all times 1:00, 2:00 etc.
+%                     hours_i = hour : 24 : (nr_days - 1) * 24 + hour;    % range to pick the i-th hour of each day throughout the yearly data, i.e. 1:00 of 1 January, 1:00 of 2 January etc.
+%                         for k = hours_i
+%                             Load_av(hour) = Load_av(hour) + Load(k);
+%                             P_pv_av(hour) = P_pv_av(hour) + P_pv(k);
+%                             batt_balance_pos_av(hour) = batt_balance_pos_av(hour) + batt_balance_pos(k);
+%                         end
+%                         Load_av(hour) = Load_av(hour) / nr_days;
+%                         P_pv_av(hour) = P_pv_av(hour) / nr_days;
+%                         batt_balance_pos_av(hour) = batt_balance_pos_av(hour) / nr_days;
+%                     end
+%                     
+%                     figure(2)
+%                     plot(Load_av,'Color',[72 122 255] / 255)
+%                     hold on
+%                     plot(P_pv_av,'Color',[255 192 33] / 255)
+%                     hold on
+%                     plot(batt_balance_pos_av,'Color',[178 147 68] / 255)
+%                     hold off
+%                     xlabel('Time over the day [hour]')
+%                     ylabel('Energy [kWh]')
+%                     title('Energy produced and estimated load profile of an average day (2nd steps PV and Batt)')
+%                     legend('Load profile','Energy from PV', 'Energy flow in battery')
+%                                         
+%                     figure(3)    
+%                     plot(ELPV(:,PV_i, batt_i) ./ batt_cap_i + 1,'Color',[142 178 68] / 255)
+%                     hold on
+%                     plot(- LL(:,PV_i, batt_i) ./ batt_cap_i + SoC_min,'Color',[255 91 60] / 255)
+%                     hold on
+%                     plot(SoC,'Color',[64 127 255] / 255)
+%                     hold off
+%                     xlabel('Time over the year [hour]')
+%                     ylabel('Power refered to State of Charge of the battery')
+%                     legend('Overproduction, not utilized', 'Loss of power', 'State of charge')
+%                 end
+%             end
 
             %% Economic Analysis
             % Investment cost
